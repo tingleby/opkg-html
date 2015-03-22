@@ -8,11 +8,25 @@
 var packages_list;
 var page_number = 0;
 var per_page = 25;
+var chunk_count;
 
 var fpackages;
 var searchPage = false;
 
-function addToTable(name,version,section,description) {
+function packageNameSort(a, b)
+{
+     var Aname = a.name.toLowerCase();
+     var Bname = b.name.toLowerCase();
+     if (Aname < Bname){
+        return -1;
+     }else if (Aname > Bname){
+       return  1;
+     }else{
+       return 0;
+     }
+};
+
+function addToTable(name,version,section,description,filename,source) {
   packages_list.append(
       "<tr data-toggle=\"collapse\" data-target=\"#"+name+"\" class=\"accordion-toggle\">"+
       "<td><button type=\"button\" class=\"btn btn-default btn-xs\" >"+
@@ -21,10 +35,16 @@ function addToTable(name,version,section,description) {
       "<td>"+name+"</td>"+
       "<td>"+version+"</td>"+
       "<td>"+section+"</td>"+
-      "</tr><tr><td colspan=\"4\" class=\"hiddenrow\">"+
+      "<td><button type=\"button\" class=\"btn btn-default btn-xs\""+
+      "onclick=\"location.href='"+filename+"'\">"+
+         "<span class=\"glyphicon glyphicon-download\" aria-hidden=\"true\"></span>"+
+
+      "</tr><tr><td colspan=\"5\" class=\"hiddenrow\">"+
       "<div id=\""+name+"\" class=\"accordion-body panel panel-default collapse\">"+
       "<div class=\"panel-heading\"><b>Description</b></div>"+
       "<div class=\"panel-body\">"+description+"</div>"+
+      "<div class=\"panel-heading\"><b>Source</b></div>"+
+      "<div class=\"panel-body\">"+source+"</div>"+
       "</div></td></tr>"
       );
 };
@@ -39,7 +59,7 @@ function renderTable() {
   }
   packages_list.empty();
   jQuery.each(l.slice(start_i, (start_i + per_page)), function(i,p) {
-    addToTable(p.name,p.version,p.section,p.description);
+    addToTable(p.name,p.version,p.section,p.description,p.filename,p.source);
   });
 }
 
@@ -57,22 +77,34 @@ function doSearch(term) {
     renderTable();
 }
 
-var packages = (function() {
-        $.ajax({
-            'url': "packages.json",
-            'dataType': "json",
-            'success': function (data) {
-                packages = data;
-                console.log("Done loading JSON");
-                renderTable();
-            },
-            'statusCode': {
-                404: function() {
-                  alert("package.json not found");
-                }
-            }
+var packages = new Array();
+
+$.getJSON( "index.json", function(data) {
+    chunk_count = data.length;
+    $.each(data, function(i,v) {
+       $.getJSON(v, function(datai) {
+         packages.push.apply(packages, datai);
+       })
+        .fail(function() { console.log("Failed to get"+data); })
+        .done(function() {
+            chunk_count--;
         });
-    })();
+
+     });
+
+    })
+  .fail(function() {
+    console.log( "Failed to get index.json" );
+  })
+  .done(function() {
+    var refr = setInterval(function(){
+      if(chunk_count == 0) {
+        clearInterval(refr);
+        packages.sort(packageNameSort);
+      }
+      renderTable();
+    }, 100);
+  });
 
 $(document).ready(function() {
    packages_list = $("#packages");

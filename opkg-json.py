@@ -25,12 +25,17 @@
 import opkg
 import json
 
+entries_per_json = 500
+split_it = lambda A, n=entries_per_json: [A[i:i+n] for i in range(0, len(A), n)]
+
 class Opkg_Package:
-    def __init__(self, name,version,section,description):
+    def __init__(self, name,version,section,filename,description,source):
         self.name = name;
         self.version = version;
         self.section = section;
+        self.filename = filename;
         self.description = description;
+        self.source = source;
 
 opkg_file = opkg.Packages()
 opkg_file.read_packages_file('./Packages')
@@ -39,9 +44,19 @@ packagelist = []
 
 for i in sorted(opkg_file.packages):
     p = opkg_file.packages[i]
-    x = Opkg_Package(p.package,p.version,p.section,p.description)
+    x = Opkg_Package(p.package,p.version,p.section,p.filename,p.description,p.source)
     packagelist.append(x)
 
-f = open('packages.json', 'w')
-json.dump(([vars(a) for a in packagelist]), f)
+split_list = split_it(packagelist)
+chunk_list = []
+
+for index_chunk, chunk in enumerate(split_list):
+    chunk_name = 'packages-'+str(index_chunk)+'.json'
+    cf = open(chunk_name, 'w')
+    json.dump(([vars(a) for a in chunk]), cf)
+    cf.close()
+    chunk_list.append(chunk_name)
+
+f = open('index.json', 'w')
+json.dump(chunk_list, f)
 f.close()
